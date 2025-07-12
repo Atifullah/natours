@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const slugify = require('slugify');
+const validator = require('validator');
 
 const tourSchema = new mongoose.Schema(
   {
@@ -7,6 +9,14 @@ const tourSchema = new mongoose.Schema(
       required: [true, 'A tour must have name'],
       unique: true,
       trim: true,
+      maxlength: [40, 'A tour name must be equal or less then 40 charchters'],
+      minlength: [10, 'A tour name must be equal or less then 10 charchters'],
+      // validate: [validator.isAlpha, 'the tour name must be charachets'],
+    },
+    slug: String,
+    secreatTour: {
+      type: Boolean,
+      default: false,
     },
     duration: {
       type: Number,
@@ -19,10 +29,16 @@ const tourSchema = new mongoose.Schema(
     difficulty: {
       type: String,
       required: [true, 'A tour Must have difficulty'],
+      enum: {
+        values: ['easy', 'medium', 'difficulty'],
+        message: 'the value should be easy,medium or difficulty',
+      },
     },
     ratingsAverage: {
       type: Number,
       default: 4.5,
+      min: [1, 'the rating must be above 1'],
+      max: [5, 'the rating must be above 5'],
     },
     ratingsQuantity: {
       type: Number,
@@ -32,7 +48,15 @@ const tourSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'A tour Must have Price'],
     },
-    priceDiscount: Number,
+    priceDiscount: {
+      type: Number,
+      validate: {
+        validator: function (val) {
+          return val < this.price;
+        },
+        message: 'Discount price ({VALUE}) should be below regular price',
+      },
+    },
     summary: {
       type: String,
       trim: true,
@@ -63,6 +87,26 @@ const tourSchema = new mongoose.Schema(
 tourSchema.virtual('durationWeek').get(function () {
   return this.duration / 7;
 });
+// document middlewear
+tourSchema.pre('save', function (next) {
+  this.slug = slugify(this.name, { lower: true });
+  next();
+});
+//  query middlewear
+tourSchema.pre(/^find/, function (next) {
+  this.find({ secretTour: { $ne: true } });
+  this.start = Date.now();
+  next();
+});
+// aggrgation middlewear
+
+tourSchema.pre('aggregate', function (next) {
+  this.pipeline().unshift({
+    $match: { secretTour: { $ne: true } },
+  });
+  next();
+});
+
 const Tour = mongoose.model('Tour', tourSchema);
 
 module.exports = Tour;
