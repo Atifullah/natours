@@ -1,6 +1,8 @@
 const express = require('express');
 const tourRoute = require('./router/tourRouter');
 const userRoute = require('./router/userRouter');
+const appError = require('./utils/appError');
+const globalErrorHandler = require('./controllers/errorController');
 const app = express();
 
 // Middleware
@@ -22,5 +24,13 @@ app.use((req, res, next) => {
 
 app.use('/api/v1/tours', tourRoute);
 app.use('/api/v1/users', userRoute);
+
+// Always keep this at the end: 404 route handler
+app.all('*', (req, res, next) => {
+  next(new appError(`Can't find ${req.originalUrl} on this server`, 404)); // Forward to global error handler
+});
+
+// Global error handling middleware
+app.use(globalErrorHandler);
 
 module.exports = app;
