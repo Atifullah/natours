@@ -1,8 +1,10 @@
 const express = require('express');
 const userRoute = express.Router();
 const userController = require('./../controllers/userController');
+const authController = require('./../controllers/authController');
 
 // user route
+userRoute.post('/signup', authController.signup);
 userRoute
   .route('/')
   .get(userController.getAllUsers)
