@@ -5,6 +5,8 @@ const authController = require('./../controllers/authController');
 
 // user route
 userRoute.post('/signup', authController.signup);
+userRoute.post('/login', authController.login);
+
 userRoute
   .route('/')
   .get(userController.getAllUsers)
