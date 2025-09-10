@@ -66,24 +66,29 @@ exports.protect = async (req, res, next) => {
   if (!token) {
     return next(new AppError('User is not logged in / signed up', 401));
   }
-  const decode = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
-  const freshUser = await User.findById(decode.id);
+  const freshUser = await User.findById(decoded.id);
   if (!freshUser) {
     return next(
-      new AppError('the user belong to this token does not exist...', 401),
+      new AppError('The user belonging to this token no longer exists.', 401),
     );
   }
 
   if (freshUser.changedPasswordAfter(decoded.iat)) {
-    return next(new AppError('User recently changed password', 401));
+    return next(
+      new AppError('User recently changed password. Please log in again.', 401),
+    );
   }
+
   req.user = freshUser;
   next();
 };
 
 exports.restrictTo = (...roles) => {
   return (req, res, next) => {
+    console.log('Current user role:', req.user.role); // 👈 log here
+
     if (!roles.includes(req.user.role)) {
       return next(
         new AppError('You do not have permission to perform this action', 403),
