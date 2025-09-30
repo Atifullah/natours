@@ -6,99 +6,62 @@ const { promisify } = require('util');
 const crypto = require('crypto');
 const sendEmail = require('./../utils/email');
 
-exports.signup = catchAsync(async (req, res) => {
-  const newUser = await User.create({
-    name: req.body.name,
-    email: req.body.email,
-    password: req.body.password,
-    confirmPassword: req.body.confirmPassword,
-    role: req.body.role, // 👈 include this
-  });
-  const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
-  res.status(201).json({
-    status: 'success',
-    token,
-    data: {
-      user: newUser,
-    },
-  });
-});
+// Generate JWT
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 };
 
-exports.login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
+// 🔑 DRY helper function
+const createSendToken = (user, statusCode, res) => {
+  const token = signToken(user._id);
 
-    if (!email || !password) {
-      return next(new AppError('Please provide email and password!', 400));
-    }
+  // Optionally, remove password from output
+  user.password = undefined;
 
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.correctPassword(password, user.password))) {
-      return next(new AppError('Incorrect email or password', 401));
-    }
-
-    const token = signToken(user._id);
-    res.status(200).json({
-      status: 'success',
-      token,
-    });
-  } catch (err) {
-    console.error('Login error:', err); // 👈 This will show you the actual problem
-    next(err);
-  }
+  res.status(statusCode).json({
+    status: 'success',
+    token,
+    data: {
+      user,
+    },
+  });
 };
 
-exports.protect = async (req, res, next) => {
-  let token;
+// ------------------ Controllers ------------------
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
+// Signup
+exports.signup = catchAsync(async (req, res) => {
+  const newUser = await User.create({
+    name: req.body.name,
+    email: req.body.email,
+    password: req.body.password,
+    confirmPassword: req.body.confirmPassword,
+    role: req.body.role,
+  });
+
+  createSendToken(newUser, 201, res);
+});
+
+// Login
+exports.login = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password!', 400));
   }
 
-  // If no token found
-  if (!token) {
-    return next(new AppError('User is not logged in / signed up', 401));
-  }
-  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const user = await User.findOne({ email }).select('+password');
 
-  const freshUser = await User.findById(decoded.id);
-  if (!freshUser) {
-    return next(
-      new AppError('The user belonging to this token no longer exists.', 401),
-    );
+  if (!user || !(await user.correctPassword(password, user.password))) {
+    return next(new AppError('Incorrect email or password', 401));
   }
 
-  if (freshUser.changedPasswordAfter(decoded.iat)) {
-    return next(
-      new AppError('User recently changed password. Please log in again.', 401),
-    );
-  }
+  createSendToken(user, 200, res);
+});
 
-  req.user = freshUser;
-  next();
-};
-
-exports.restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new AppError('You do not have permission to perform this action', 403),
-      );
-    }
-
-    next();
-  };
-};
+// Reset Password
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   // 1) Get user by email
@@ -145,14 +108,12 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
     );
   }
 });
-
 exports.resetPassword = catchAsync(async (req, res, next) => {
   const hashedToken = crypto
     .createHash('sha256')
     .update(req.params.token)
     .digest('hex');
 
-  // 2) Find user by token and check if token is still valid (not expired)
   const user = await User.findOne({
     passwordResetToken: hashedToken,
     passwordResetExpires: { $gt: Date.now() },
@@ -162,23 +123,34 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     return next(new AppError('Token is invalid or has expired', 400));
   }
 
-  // 3) Set the new password
   user.password = req.body.password;
   user.confirmPassword = req.body.confirmPassword;
-
-  // clear reset token fields
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
 
-  await user.save(); // run validators and hash password
+  await user.save();
 
-  // 4) Log the user in, send new JWT
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
+  createSendToken(user, 200, res);
+});
 
-  res.status(200).json({
-    status: 'success',
-    token,
-  });
+// Update Password
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('+password');
+
+  if (!user) return next(new AppError('User not found', 404));
+
+  const isCorrect = await user.correctPassword(
+    req.body.currentPassword,
+    user.password,
+  );
+
+  if (!isCorrect) {
+    return next(new AppError('Your current password is wrong.', 401));
+  }
+
+  user.password = req.body.newPassword;
+  user.confirmPassword = req.body.confirmPassword;
+  await user.save();
+
+  createSendToken(user, 200, res);
 });
