@@ -41,6 +41,11 @@ const userSchema = new mongoose.Schema({
 
   passwordResetToken: String,
   passwordResetExpires: Date,
+  active: {
+    type: Boolean,
+    default: true,
+    select: false,
+  },
 });
 
 // Hash password before saving
@@ -63,6 +68,11 @@ userSchema.methods.correctPassword = async function (
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
 };
+userSchema.pre(/^find/, function (next) {
+  // 'this' points to the current query
+  this.find({ active: { $ne: false } });
+  next();
+});
 
 // Check if user changed password after the token was issued
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
