@@ -13,6 +13,8 @@ userRoute.patch(
   authController.protect,
   authController.updatePassword,
 );
+userRoute.patch('/updateMe', authController.protect, userController.updateMe);
+
 userRoute
   .route('/')
   .get(userController.getAllUsers)
