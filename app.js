@@ -10,9 +10,14 @@ const rateLimit = require('express-rate-limit');
 
 const morgan = require('morgan');
 const Limiter = rateLimit({
-  max: 100,
+  max: 2,
   windowMs: 60 * 60 * 1000,
-  message: 'too many request for this Ip, please try again later after an hour',
+  standardHeaders: true, // ✅ Return rate limit info in headers
+  legacyHeaders: false, // ❌ Disable old X-RateLimit headers
+  message: {
+    status: 'fail',
+    message: 'Too many requests from this IP, please try again after an hour.',
+  },
 });
 
 app.use('/api', Limiter);
