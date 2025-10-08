@@ -77,6 +77,36 @@ const tourSchema = new mongoose.Schema(
       select: false,
     },
     startDates: [Date],
+    startLocation: {
+      // GeoJSON format
+      type: {
+        type: String,
+        default: 'Point',
+        enum: ['Point'],
+      },
+      coordinates: [Number], // [longitude, latitude]
+      address: String,
+      description: String,
+    },
+    locations: [
+      {
+        type: {
+          type: String,
+          default: 'Point',
+          enum: ['Point'],
+        },
+        coordinates: [Number], // [longitude, latitude]
+        address: String,
+        description: String,
+        day: Number, // optional: which day the tour reaches this location
+      },
+    ],
+    guides: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     toJSON: { virtuals: true },
@@ -98,14 +128,22 @@ tourSchema.pre(/^find/, function (next) {
   this.start = Date.now();
   next();
 });
-// aggrgation middlewear
 
-tourSchema.pre('aggregate', function (next) {
-  this.pipeline().unshift({
-    $match: { secretTour: { $ne: true } },
+tourSchema.pre(/^find/, function (next) {
+  this.populate({
+    path: 'guides',
+    select: '-__v -passwordChangedAt',
   });
   next();
-});
+}),
+  // aggrgation middlewear
+
+  tourSchema.pre('aggregate', function (next) {
+    this.pipeline().unshift({
+      $match: { secretTour: { $ne: true } },
+    });
+    next();
+  });
 
 const Tour = mongoose.model('Tour', tourSchema);
 
