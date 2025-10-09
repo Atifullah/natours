@@ -15,7 +15,7 @@ exports.aliasTopTour = (req, res, next) => {
 
 // Routes Handlers
 exports.getAllTours = catchAsync(async (req, res, next) => {
-  const features = new ApiFeatures(Tour.find(), req.query)
+  const features = new ApiFeatures(Tour.find().populate('reviews'), req.query)
     .filter()
     .sort()
     .limitFields()
@@ -34,7 +34,13 @@ exports.getAllTours = catchAsync(async (req, res, next) => {
 });
 
 exports.getTour = catchAsync(async (req, res, next) => {
-  const findTour = await Tour.findById(req.params.id);
+  const findTour = await Tour.findById(req.params.id).populate({
+    path: 'reviews',
+    populate: {
+      path: 'user',
+      select: 'name photo',
+    },
+  });
   if (!findTour) {
     return next(new appError('no tour found with this ID', 404));
   }

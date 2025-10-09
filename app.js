@@ -1,6 +1,8 @@
 const express = require('express');
 const tourRoute = require('./router/tourRouter');
 const userRoute = require('./router/userRouter');
+const reviewRouter = require('./router/reviewRouter');
+
 const appError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
 const rateLimit = require('express-rate-limit');
@@ -67,6 +69,7 @@ app.use((req, res, next) => {
 // ✅ 9. Routes
 app.use('/api/v1/tours', tourRoute);
 app.use('/api/v1/users', userRoute);
+app.use('/api/v1/review', reviewRouter);
 
 // ✅ 10. Handle undefined routes
 app.all('*', (req, res, next) => {

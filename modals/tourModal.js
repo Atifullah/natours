@@ -14,7 +14,7 @@ const tourSchema = new mongoose.Schema(
       // validate: [validator.isAlpha, 'the tour name must be charachets'],
     },
     slug: String,
-    secreatTour: {
+    secretTour: {
       type: Boolean,
       default: false,
     },
@@ -114,6 +114,12 @@ const tourSchema = new mongoose.Schema(
   },
 );
 
+tourSchema.virtual('reviews', {
+  ref: 'Review',
+  foreignField: 'tour',
+  localField: '_id',
+});
+
 tourSchema.virtual('durationWeek').get(function () {
   return this.duration / 7;
 });
@@ -125,7 +131,6 @@ tourSchema.pre('save', function (next) {
 //  query middlewear
 tourSchema.pre(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
-  this.start = Date.now();
   next();
 });
 
