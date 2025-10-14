@@ -1,7 +1,7 @@
 const User = require('./../modals/userModal');
 const catchAsync = require('./../utils/catchAsync');
 const AppError = require('./../utils/appError');
-
+const factory = require('../controllers/handlerFactory');
 // Helper function: filter out unwanted fields
 const filterObj = (obj, ...allowedFields) => {
   const newObj = {};
@@ -50,42 +50,16 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
 });
 
 // ------------------- Other stubs -------------------
-exports.getAllUsers = catchAsync(async (req, res, next) => {
-  const users = await User.find(); // middleware auto-filters inactive users
+exports.getAllUsers = factory.getAll(User);
 
-  res.status(200).json({
-    status: 'success',
-    results: users.length,
-    data: {
-      users,
-    },
-  });
-});
-
-exports.getUser = (req, res) => {
-  res.status(500).json({
-    status: 'error',
-    message: 'This route is not defined yet',
-  });
-};
-
+exports.getUser = factory.getOne(User);
 exports.createUser = (req, res) => {
   res.status(500).json({
     status: 'error',
-    message: 'This route is not defined yet',
+    message: 'This route is not defined yet please use /signup',
   });
 };
 
-exports.deleteUser = (req, res) => {
-  res.status(500).json({
-    status: 'error',
-    message: 'This route is not defined yet',
-  });
-};
-
-exports.updateUser = (req, res) => {
-  res.status(500).json({
-    status: 'error',
-    message: 'This route is not defined yet',
-  });
-};
+exports.deleteUser = factory.deleteOne(User);
+// here you can't change the password
+exports.updateUser = factory.updateOne(User);
