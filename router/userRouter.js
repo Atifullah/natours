@@ -8,13 +8,18 @@ userRoute.post('/signup', authController.signup);
 userRoute.post('/login', authController.login);
 userRoute.post('/forgotPassword', authController.forgotPassword);
 userRoute.patch('/resetPassword/:token', authController.resetPassword);
+// auth login must for all
+userRoute.use(authController.protect);
 userRoute.patch(
   '/updateMyPassword',
-  authController.protect,
+
   authController.updatePassword,
 );
-userRoute.patch('/updateMe', authController.protect, userController.updateMe);
-userRoute.delete('/deleteMe', authController.protect, userController.deleteMe);
+userRoute.get('/me', userController.getMe, userController.getUser);
+userRoute.patch('/updateMe', userController.updateMe);
+userRoute.delete('/deleteMe', userController.deleteMe);
+
+userRoute.use(authController.restrictTo('admin', 'lead-guide'));
 
 userRoute
   .route('/')
@@ -24,10 +29,6 @@ userRoute
   .route('/:id')
   .get(userController.getUser)
   .patch(userController.updateUser)
-  .delete(
-    authController.protect,
-    authController.restrictTo('admin', 'lead-guide'),
-    userController.deleteUser,
-  );
+  .delete(userController.deleteUser);
 
 module.exports = userRoute; // in userRouter.js

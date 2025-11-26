@@ -50,8 +50,11 @@ exports.getOne = (Model, populateOptions) =>
     if (req.params.tourId) filter = { tour: req.params.tourId };
 
     // Build query
-    let query = Model.find(filter);
-
+    if (req.params.id) {
+      query = Model.findById(req.params.id);
+    } else {
+      query = Model.find();
+    }
     // Apply populate if provided
     if (populateOptions) query = query.populate(populateOptions);
 
