@@ -35,6 +35,9 @@ tourRoute
   );
 
 tourRoute
+  .route('/tour-within/:distance/center/:latlng/unit/:unit')
+  .get(tourController.getGeoLocation);
+tourRoute
   .route('/')
   .get(tourController.getAllTours)
   .post(

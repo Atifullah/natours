@@ -1,8 +1,9 @@
 const { json } = require('express');
 const Tour = require('../modals/tourModal');
 const catchAsync = require('./../utils/catchAsync');
-const appError = require('../utils/appError');
+const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
+
 // top cheap items
 
 exports.aliasTopTour = (req, res, next) => {
@@ -90,6 +91,42 @@ exports.getMonthlyPlan = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       tour: plan,
+    },
+  });
+});
+exports.getGeoLocation = catchAsync(async (req, res, next) => {
+  const { distance, latlng, unit } = req.params;
+
+  if (!latlng) {
+    return next(
+      new AppError('Please provide latlng in the format lat,lng', 400),
+    );
+  }
+
+  const [lat, lng] = latlng.split(',');
+
+  if (!lat || !lng) {
+    return next(
+      new AppError('Please provide both latitude and longitude!', 400),
+    );
+  }
+
+  // Convert distance to radians (Earth radius: mi=3963, km=6378)
+  const radius = unit === 'mi' ? distance / 3963.2 : distance / 6378.1;
+
+  const tours = await Tour.find({
+    startLocation: {
+      $geoWithin: {
+        $centerSphere: [[lng * 1, lat * 1], radius],
+      },
+    },
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: tours.length,
+    data: {
+      tours,
     },
   });
 });

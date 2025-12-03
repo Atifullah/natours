@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Tour = require('./tourModal'); // IMPORTANT: import your Tour model
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -29,13 +30,12 @@ const reviewSchema = new mongoose.Schema(
     },
   },
   {
-    // Always include virtual fields when outputting JSON or Objects
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
-// Populate user info automatically (if needed)
+// Populate user info (optional)
 reviewSchema.pre(/^find/, function (next) {
   this.populate({
     path: 'user',
@@ -44,10 +44,56 @@ reviewSchema.pre(/^find/, function (next) {
   next();
 });
 
-// Prevent duplicate reviews per user per tour
+// Prevent duplicate reviews
 reviewSchema.index({ tour: 1, user: 1 }, { unique: true });
 
-// Create the Review model
+// ---------- STATIC METHOD TO CALCULATE AVERAGE ----------
+reviewSchema.statics.calcAverageRatings = async function (tourId) {
+  const stats = await this.aggregate([
+    { $match: { tour: tourId } },
+    {
+      $group: {
+        _id: '$tour',
+        nRatings: { $sum: 1 },
+        avgRating: { $avg: '$rating' },
+      },
+    },
+  ]);
+
+  if (stats.length > 0) {
+    await Tour.findByIdAndUpdate(tourId, {
+      ratingsQuantity: stats[0].nRatings,
+      ratingsAverage: stats[0].avgRating,
+    });
+  } else {
+    // If no reviews left, reset values
+    await Tour.findByIdAndUpdate(tourId, {
+      ratingsQuantity: 0,
+      ratingsAverage: 4.5, // default
+    });
+  }
+};
+
+// ---------- POST MIDDLEWARE FOR CREATE ----------
+reviewSchema.post('save', function () {
+  // this.constructor = Review
+  this.constructor.calcAverageRatings(this.tour);
+});
+
+// ---------- PRE middleware for UPDATE & DELETE ----------
+reviewSchema.pre(/^findOneAnd/, async function (next) {
+  this.r = await this.findOne();
+  next();
+});
+
+// ---------- POST middleware for UPDATE & DELETE ----------
+reviewSchema.post(/^findOneAnd/, async function () {
+  if (this.r) {
+    await this.r.constructor.calcAverageRatings(this.r.tour);
+  }
+});
+
+// Create Review model
 const Review = mongoose.model('Review', reviewSchema);
 
 module.exports = Review;

@@ -6,88 +6,106 @@ const tourSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'A tour must have name'],
+      required: [true, 'A tour must have a name'],
       unique: true,
       trim: true,
-      maxlength: [40, 'A tour name must be equal or less then 40 charchters'],
-      minlength: [10, 'A tour name must be equal or less then 10 charchters'],
-      // validate: [validator.isAlpha, 'the tour name must be charachets'],
+      maxlength: [40, 'A tour name must be equal or less than 40 characters'],
+      minlength: [10, 'A tour name must be equal or more than 10 characters'],
+      // validate: [validator.isAlpha, 'Tour name must only contain characters']
     },
+
     slug: String,
+
     secretTour: {
       type: Boolean,
       default: false,
     },
+
     duration: {
       type: Number,
-      required: [true, 'A tour Must have duration'],
+      required: [true, 'A tour must have duration'],
     },
+
     maxGroupSize: {
       type: Number,
-      required: [true, 'A tour Must have max Group size'],
+      required: [true, 'A tour must have max group size'],
     },
+
     difficulty: {
       type: String,
-      required: [true, 'A tour Must have difficulty'],
+      required: [true, 'A tour must have difficulty'],
       enum: {
         values: ['easy', 'medium', 'difficulty'],
-        message: 'the value should be easy,medium or difficulty',
+        message: 'Difficulty is either: easy, medium, or difficulty',
       },
     },
+
+    // ⭐ Required for Review Average Rating
     ratingsAverage: {
       type: Number,
       default: 4.5,
-      min: [1, 'the rating must be above 1'],
-      max: [5, 'the rating must be above 5'],
+      min: [1, 'Rating must be above 1.0'],
+      max: [5, 'Rating must be below 5.0'],
+      set: (val) => Math.round(val * 10) / 10, // 4.6666 → 4.7
     },
+
     ratingsQuantity: {
       type: Number,
       default: 0,
     },
+
     price: {
       type: Number,
-      required: [true, 'A tour Must have Price'],
+      required: [true, 'A tour must have price'],
     },
+
     priceDiscount: {
       type: Number,
       validate: {
         validator: function (val) {
-          return val < this.price;
+          return val < this.price; // Only works on CREATE
         },
         message: 'Discount price ({VALUE}) should be below regular price',
       },
     },
+
     summary: {
       type: String,
       trim: true,
-      required: [true, 'A tour Must have description'],
+      required: [true, 'A tour must have a summary'],
     },
+
     description: {
       type: String,
       trim: true,
     },
+
     imageCover: {
       type: String,
-      required: [true, 'A tour Must have cover image'],
+      required: [true, 'A tour must have a cover image'],
     },
+
     images: [String],
+
     createdAt: {
       type: Date,
       default: Date.now(),
       select: false,
     },
+
     startDates: [Date],
+
     startLocation: {
-      // GeoJSON format
       type: {
         type: String,
         default: 'Point',
         enum: ['Point'],
       },
-      coordinates: [Number], // [longitude, latitude]
+      coordinates: [Number],
       address: String,
       description: String,
     },
+
     locations: [
       {
         type: {
@@ -95,12 +113,13 @@ const tourSchema = new mongoose.Schema(
           default: 'Point',
           enum: ['Point'],
         },
-        coordinates: [Number], // [longitude, latitude]
+        coordinates: [Number],
         address: String,
         description: String,
-        day: Number, // optional: which day the tour reaches this location
+        day: Number,
       },
     ],
+
     guides: [
       {
         type: mongoose.Schema.ObjectId,
@@ -114,45 +133,51 @@ const tourSchema = new mongoose.Schema(
   },
 );
 
-tourSchema.index({ price: 1, ratingAverage: -1 });
+// ⭐ Indexes
+tourSchema.index({ price: 1, ratingsAverage: -1 });
 tourSchema.index({ slug: 1 });
+tourSchema.index({ startLocation: '2dsphere' });
 
+// ⭐ Virtual populate for reviews
 tourSchema.virtual('reviews', {
   ref: 'Review',
   foreignField: 'tour',
   localField: '_id',
 });
 
+// Virtual duration in weeks
 tourSchema.virtual('durationWeek').get(function () {
   return this.duration / 7;
 });
-// document middlewear
+
+// ✔ Document middleware – create slug
 tourSchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
-//  query middlewear
+
+// ✔ Query middleware – hide secret tours
 tourSchema.pre(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
   next();
 });
 
+// ✔ Populate guides
 tourSchema.pre(/^find/, function (next) {
   this.populate({
     path: 'guides',
     select: '-__v -passwordChangedAt',
   });
   next();
-}),
-  // aggrgation middlewear
+});
 
-  tourSchema.pre('aggregate', function (next) {
-    this.pipeline().unshift({
-      $match: { secretTour: { $ne: true } },
-    });
-    next();
+// ✔ Aggregation middleware – hide secret tours
+tourSchema.pre('aggregate', function (next) {
+  this.pipeline().unshift({
+    $match: { secretTour: { $ne: true } },
   });
+  next();
+});
 
 const Tour = mongoose.model('Tour', tourSchema);
-
 module.exports = Tour;
